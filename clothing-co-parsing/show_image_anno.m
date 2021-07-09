@@ -21,6 +21,7 @@ function show_annotation(im, tags, label_list)
 % get image-level labels name
 label_names = cell(1, length(tags));
 for i = 1:length(tags)
+    disp(tags)
     label_names(i) = label_list( tags(i)+1 );
 end
 

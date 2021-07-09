@@ -23,7 +23,7 @@ colors = colormap( jet(length(label_list)) );   % set color map
 subplot(1, 3, 1);  imshow(im); hold on; title('Original'); 
 
 % % 2. visualize annotation
-gt_image = zeros(size(groundtruth, 1), size(groundtruth, 2), 3);
+gt_image = zeros(size(groundtruth, 1), size(gr oundtruth, 2), 3);
 
 for labelidx = 1:length(cur_labels)
     [rows cols] = find(groundtruth == cur_labels(labelidx));

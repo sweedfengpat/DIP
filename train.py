@@ -1,4 +1,6 @@
+import sys
 import os
+from typing import Literal
 # for array operations
 import numpy as np
 # tensorflow framework
@@ -12,10 +14,21 @@ import matplotlib as mpl
 # for viewing iteration status
 from tqdm import tqdm
 from tensorflow_examples.models.pix2pix import pix2pix
+import pandas as pd
+from PIL import Image
 from sklearn.model_selection import train_test_split
 # a list to collect paths of 1000 images
+
+from tensorflow.compat.v1 import ConfigProto
+from tensorflow.compat.v1 import InteractiveSession
+from statistics import mode
+
+config = ConfigProto()
+config.gpu_options.allow_growth = True
+session = InteractiveSession(config=config)
+
 image_path = []
-for root, dirs, files in os.walk('C:\\Users\\patza\\Desktop\\dip\\IMAGES'):
+for root, dirs, files in os.walk('C:\\Users\\PAT\\Desktop\\dip\\DIP\\IMAGES'):
     # iterate over 1000 images
     for file in files:
         # create path
@@ -29,7 +42,7 @@ print(len(image_path))
 
 # a list to collect paths of 1000 masks
 mask_path = []
-for root, dirs, files in os.walk('C:\\Users\\patza\\Desktop\\dip\\MASKS'):
+for root, dirs, files in os.walk('C:\\Users\\PAT\\Desktop\\dip\\DIP\\MASKS'):
     #iterate over 1000 masks
     for file in files:
         # obtain the path
@@ -65,6 +78,7 @@ for path in tqdm(mask_path):
     # append mask to the list
     masks.append(mask)
 
+"""
 print(list(images))
 plt.figure(figsize=(16,5))
 for i in range(1,4):
@@ -75,8 +89,9 @@ for i in range(1,4):
     plt.colorbar()
     plt.axis('off')
 plt.show()
+"""
 NORM = mpl.colors.Normalize(vmin=0, vmax=58)
-
+"""
 # plot masks
 plt.figure(figsize=(16,5))
 for i in range(1,4):
@@ -86,6 +101,8 @@ for i in range(1,4):
     plt.colorbar()
     plt.axis('off')
 plt.show()
+
+"""
 
 base = keras.applications.DenseNet121(input_shape=[128,128,3],include_top=False,weights='imagenet')
 len(base.layers)
@@ -140,14 +157,6 @@ X = [resize_image(i) for i in images]
 y = [resize_mask(m) for m in masks]
 len(X), len(y)
 images[0].dtype, masks[0].dtype, X[0].dtype, y[0].dtype
-plt.imshow(X[0])
-plt.colorbar()
-plt.show()
-
-#plot a mask
-plt.imshow(y[0], cmap='jet')
-plt.colorbar()
-plt.show()
 
 # split data into 80/20 ratio
 train_X, val_X,train_y, val_y = train_test_split(X, y, test_size=0.2,random_state=0)
@@ -221,7 +230,6 @@ d = train.map(crop)
 e = train.map(flip_hori)
 f = train.map(flip_vert)
 g = train.map(rotate)
-
 # concatenate every new augmented sets
 train = train.concatenate(a)
 train = train.concatenate(b)
@@ -242,49 +250,135 @@ train = train.cache().shuffle(BUFFER).batch(BATCH).repeat()
 train = train.prefetch(buffer_size=AT)
 val = val.batch(BATCH)
 
-example = next(iter(train))
-preds = unet(example[0])
-# visualize an image
-plt.imshow(example[0][60])
-plt.colorbar()
-plt.show()
 
-# visualize the predicted mask
-pred_mask = tf.argmax(preds, axis=-1)
-pred_mask = tf.expand_dims(pred_mask, -1)
-plt.imshow(pred_mask[0], cmap='jet', norm=NORM)
-plt.colorbar()
+def Compile_Model():
+    unet.compile(loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+            optimizer=keras.optimizers.RMSprop(lr=0.001),
+            metrics=['accuracy']) 
+Compile_Model()
 
-unet.compile(loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True),optimizer=keras.optimizers.RMSprop(lr=0.001),metrics=['accuracy']) 
 
-hist = unet.fit(train,validation_data=val,steps_per_epoch=STEPS_PER_EPOCH,validation_steps=VALIDATION_STEPS,epochs=200)
+hist_1 = unet.fit(train,validation_data=val,steps_per_epoch=STEPS_PER_EPOCH,validation_steps=VALIDATION_STEPS,epochs=185)
+#hist_1 = unet.fit(train,validation_data=val,steps_per_epoch=STEPS_PER_EPOCH,validation_steps=VALIDATION_STEPS,epochs=160,batch_size=64,verbose=0)
+
+def modeee(array):
+    most = max(list(map(array.count, array)))
+    return list(set(filter(lambda x: array.count(x) == most, array)))
+
 
 # select a validation data batch
 img, mask = next(iter(val))
 # make prediction
 pred = unet.predict(img)
-plt.figure(figsize=(10,5))
-# plot the predicted mask
+plt.figure(figsize=(20,30))
+
+
+unet.save("Beta1.h5")
+k = 0
 for i in pred:
-    plt.subplot(121)
+    unitt_pre = []
+    unitt_real = []
+    # plot the predicted mask
+    plt.subplot(4,3,1+k*3)
     i = tf.argmax(i, axis=-1)
+    pr = tf.get_static_value(i)
+
+    for kk in pr:
+        test = kk.tolist()
+        test = list(filter(lambda test: test > 0,test))
+        if test == []:
+            continue
+        showw = modeee(test)
+        for h in showw:
+            unitt_pre.append(h)
+    
+    ex = np.unique(unitt_pre)
+    labels = ['null','accessories','bag','belt','blazer','blouse','bodysuit','boots','bra','bracelet','cape','cardigan','clogs',
+    'coat','dress','earrings','flats','glasses','gloves','hair','hat','heels','hoodie','intimate','jacket','jeans','jumper','leggings',
+    'loafers','necklace','panties','pants','pumps','purse','ring','romper','sandals','scarf','shirt','shoes','shorts','skin','skirt','sneakers',
+    'socks','stockings','suit','sunglasses','sweater','sweatshirt','swimwear','t-shirt','tie','tights','top','vest','wallet','watch','wedges']
+
+    cloth_pre = []
+
+    for N in ex:
+        cloth_pre.append(labels[N])
+
     plt.imshow(i,cmap='jet', norm=NORM)
     plt.axis('off')
-    plt.title('Prediction')
-    break
-# plot the groundtruth mask
-plt.subplot(122)
-plt.imshow(mask[0], cmap='jet', norm=NORM)
-plt.axis('off')
-plt.title('Ground Truth')
-plt.show()
-history = hist.history
-acc=history['accuracy']
-val_acc = history['val_accuracy']
+    unit_yy = 0
+    for unit in cloth_pre:
+        plt.text(125, 0+unit_yy, unit, size=12,
+         ha="center", va="center",
+         bbox=dict(boxstyle="round",
+                   ec=(1., 0.5, 0.5),
+                   fc=(1., 0.8, 0.8),
+                   )
+         )
+        unit_yy += 20
+    
+    plt.title('Prediction',loc='left')
 
-plt.plot(acc, '-', label='Training Accuracy')
-plt.plot(val_acc, '--', label='Validation Accuracy')
+    
+    # plot the groundtruth mask
+    plt.subplot(4,3,2+k*3)
+    pr = tf.get_static_value(mask[k])
+
+    for kk in pr:
+        test = kk.tolist()
+        ary_test = []
+        for ary in test:
+            ary_test.append(ary[0]) 
+        test = ary_test
+        test = list(filter(lambda test: test > 0,test))
+        if test == []:
+            continue
+        showw = modeee(test)
+        for h in showw:
+            unitt_real.append(h)
+    
+    ex2 = np.unique(unitt_real)
+    cloth_real = []
+
+    for N in ex2:
+        cloth_real.append(labels[N])
+    plt.imshow(mask[k], cmap='jet', norm=NORM)
+    plt.axis('off')
+    unit_yy = 0
+    for unit in cloth_real:
+        plt.text(125, 0+unit_yy, unit, size=12,
+         ha="center", va="center",
+         bbox=dict(boxstyle="round",
+                   ec=(1., 0.5, 0.5),
+                   fc=(1., 0.8, 0.8),
+                   )
+         )
+        unit_yy += 20
+    plt.title('Ground Truth',loc='left')
+    
+    # plot the actual image
+    plt.subplot(4,3,3+k*3)
+    plt.imshow(img[k])
+    plt.axis('off')
+    plt.title('Actual Image')
+    k += 1
+    if k == 4: break
+plt.suptitle('Predition After 50 Epochs (No Fine-tuning)', color='red', size=20)  
+plt.show()
+
+downstack.trainable = True
+# compile again
+Compile_Model()
+
+
+history_1 = hist_1.history
+acc=history_1['accuracy']
+val_acc = history_1['val_accuracy']
+
+plt.plot(acc[:2700], '-', label='Training')
+plt.plot(val_acc[:2700], '--', label='Validation')
+plt.plot([50,50],[0.7,1.0], '--g', label='Fine-Tuning')
 plt.xlabel('Epochs')
 plt.ylabel('Accuracy')
+plt.ylim([0.7,1.0])
 plt.legend()
 plt.show()
